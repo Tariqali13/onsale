@@ -7,7 +7,7 @@ export async function resetEvent(s: { db: Db; redis: Redis; events: EventsRepo }
   await s.db.query('DELETE FROM idempotency_keys WHERE order_id IN (SELECT id FROM orders WHERE event_id = $1)', [eventId]);
   await s.db.query('DELETE FROM orders WHERE event_id = $1', [eventId]);
 
-  for (const pattern of [`q:{${eventId}}:*`, `hold:{${eventId}}:*`, `holds:{${eventId}}:*`, `sold:{${eventId}}*`]) {
+  for (const pattern of [`q:{${eventId}}:*`, `hold:{${eventId}}:*`, `holds:{${eventId}}:*`, `sold:{${eventId}}*`, `hb:{${eventId}}:*`]) {
     let cursor = '0';
     do {
       const [next, found] = await s.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 500);

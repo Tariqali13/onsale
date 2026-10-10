@@ -12,35 +12,72 @@ import { keys } from '../lib/redis.js';
  * be sized for `maxActive`, not for total demand.
  */
 
-// Admit atomically: expire stale active sessions, compute free capacity,
-// pop that many from the head of the queue and mark them active.
-// KEYS: waiting, active, stats   ARGV: nowMs, batch, maxActive, accessWindowMs
+// Admit atomically: expire stale active sessions, compute free capacity, then pop
+// from the head of the queue. Sessions whose heartbeat has lapsed (tab closed, phone
+// locked, gave up) are dropped instead of admitted, so ghosts never take a slot.
+// Admitted sessions get a short *claim* window; it becomes the full access window
+// only once the buyer actually polls and picks up their pass.
+// KEYS: waiting, active, stats
+// ARGV: nowMs, batch, maxActive, claimWindowMs, heartbeatKeyPrefix
 const ADMIT_LUA = `
 local now = tonumber(ARGV[1])
 local batch = tonumber(ARGV[2])
 local maxActive = tonumber(ARGV[3])
-local windowMs = tonumber(ARGV[4])
+local claimMs = tonumber(ARGV[4])
+local hbPrefix = ARGV[5]
 redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
 local free = maxActive - redis.call('ZCARD', KEYS[2])
-local n = math.min(batch, free)
-if n <= 0 then return {} end
-local popped = redis.call('ZPOPMIN', KEYS[1], n)
+local want = math.min(batch, free)
 local admitted = {}
-for i = 1, #popped, 2 do
-  redis.call('ZADD', KEYS[2], now + windowMs, popped[i])
-  admitted[#admitted + 1] = popped[i]
+local dropped = 0
+local budget = want * 4 + 10 -- bound the script's work even if the queue is full of ghosts
+while #admitted < want and budget > 0 do
+  local popped = redis.call('ZPOPMIN', KEYS[1], 1)
+  if #popped == 0 then break end
+  budget = budget - 1
+  local token = popped[1]
+  if redis.call('EXISTS', hbPrefix .. token) == 1 then
+    redis.call('ZADD', KEYS[2], now + claimMs, token)
+    admitted[#admitted + 1] = token
+  else
+    dropped = dropped + 1
+  end
 end
 if #admitted > 0 then redis.call('HINCRBY', KEYS[3], 'admitted', #admitted) end
+if dropped > 0 then redis.call('HINCRBY', KEYS[3], 'abandoned', dropped) end
 return admitted
 `;
 
 // Join is idempotent: a session already waiting keeps its place; one already
-// admitted stays admitted. KEYS: waiting, active, stats  ARGV: token, nowMs
+// admitted stays admitted. KEYS: waiting, active, stats, heartbeat
+// ARGV: token, score, heartbeatMs
 const JOIN_LUA = `
+redis.call('SET', KEYS[4], '1', 'PX', ARGV[3])
 if redis.call('ZSCORE', KEYS[2], ARGV[1]) then return 'active' end
 local added = redis.call('ZADD', KEYS[1], 'NX', ARGV[2], ARGV[1])
 if added == 1 then redis.call('HINCRBY', KEYS[3], 'joined', 1) return 'joined' end
 return 'waiting'
+`;
+
+// Poll: refresh the heartbeat while waiting; on the first poll after admission,
+// claim the slot (extend the short claim window to the full access window).
+// KEYS: waiting, active, heartbeat, claimed   ARGV: token, nowMs, accessWindowMs, heartbeatMs
+const STATUS_LUA = `
+local now = tonumber(ARGV[2])
+local score = redis.call('ZSCORE', KEYS[2], ARGV[1])
+if score and tonumber(score) > now then
+  if redis.call('SADD', KEYS[4], ARGV[1]) == 1 then
+    redis.call('PEXPIRE', KEYS[4], ARGV[3])
+    local full = now + tonumber(ARGV[3])
+    redis.call('ZADD', KEYS[2], 'XX', 'GT', full, ARGV[1])
+    score = full
+  end
+  return {'admitted', tostring(score)}
+end
+local rank = redis.call('ZRANK', KEYS[1], ARGV[1])
+if not rank then return {'unknown'} end
+redis.call('SET', KEYS[3], '1', 'PX', ARGV[4])
+return {'waiting', rank, redis.call('ZCARD', KEYS[1])}
 `;
 
 export type QueueStatus =
@@ -52,13 +89,23 @@ export interface WaitingRoomOptions {
   admitRatePerSec: number;
   maxActive: number;
   accessWindowSec: number;
+  /** An admitted session must pick up its pass within this window or the slot is reclaimed. */
+  claimWindowSec?: number;
+  /** A waiting session that stops polling for this long is considered gone. */
+  heartbeatSec?: number;
 }
 
 export class WaitingRoom {
+  private readonly claimWindowMs: number;
+  private readonly heartbeatMs: number;
+
   constructor(
     private readonly redis: Redis,
     private readonly opts: WaitingRoomOptions,
-  ) {}
+  ) {
+    this.claimWindowMs = (opts.claimWindowSec ?? 30) * 1000;
+    this.heartbeatMs = (opts.heartbeatSec ?? 20) * 1000;
+  }
 
   static newSessionId(): string {
     return randomBytes(16).toString('base64url');
@@ -69,30 +116,38 @@ export class WaitingRoom {
     const score = now + Math.random() / 1000;
     return (await this.redis.eval(
       JOIN_LUA,
-      3,
+      4,
       keys.waiting(eventId),
       keys.active(eventId),
       keys.stats(eventId),
+      keys.heartbeat(eventId, sessionId),
       sessionId,
       String(score),
+      String(this.heartbeatMs),
     )) as 'joined' | 'waiting' | 'active';
   }
 
   async status(eventId: string, sessionId: string, now = Date.now()): Promise<QueueStatus> {
-    const [activeScore, rank, size] = await Promise.all([
-      this.redis.zscore(keys.active(eventId), sessionId),
-      this.redis.zrank(keys.waiting(eventId), sessionId),
-      this.redis.zcard(keys.waiting(eventId)),
-    ]);
-    if (activeScore !== null && Number(activeScore) > now) {
-      return { state: 'admitted', expiresAt: Number(activeScore) };
-    }
-    if (rank === null) return { state: 'unknown' };
+    const res = (await this.redis.eval(
+      STATUS_LUA,
+      4,
+      keys.waiting(eventId),
+      keys.active(eventId),
+      keys.heartbeat(eventId, sessionId),
+      keys.claimed(eventId),
+      sessionId,
+      String(now),
+      String(this.opts.accessWindowSec * 1000),
+      String(this.heartbeatMs),
+    )) as [string, (string | number)?, number?];
+    if (res[0] === 'admitted') return { state: 'admitted', expiresAt: Number(res[1]) };
+    if (res[0] === 'unknown') return { state: 'unknown' };
+    const rank = Number(res[1]);
     return {
       state: 'waiting',
       position: rank + 1,
       ahead: rank,
-      queueSize: size,
+      queueSize: Number(res[2]),
       etaSeconds: Math.ceil((rank + 1) / this.opts.admitRatePerSec),
     };
   }
@@ -109,7 +164,8 @@ export class WaitingRoom {
       String(now),
       String(batch),
       String(this.opts.maxActive),
-      String(this.opts.accessWindowSec * 1000),
+      String(this.claimWindowMs),
+      keys.heartbeat(eventId, ''),
     )) as string[];
   }
 
@@ -143,6 +199,7 @@ export class WaitingRoom {
       active,
       joined: Number(stats.joined ?? 0),
       admitted: Number(stats.admitted ?? 0),
+      abandoned: Number(stats.abandoned ?? 0),
       admitRatePerSec: this.opts.admitRatePerSec,
       maxActive: this.opts.maxActive,
     };

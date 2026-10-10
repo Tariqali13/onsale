@@ -67,6 +67,39 @@ describe('WaitingRoom', () => {
   });
 });
 
+describe('ghosts and claim windows', () => {
+  it('skips sessions that stopped polling instead of giving them a slot', async () => {
+    const r = new WaitingRoom(ctx.redis, { admitRatePerSec: 10, maxActive: 25, accessWindowSec: 60, heartbeatSec: 1 });
+    const t0 = Date.now();
+    await r.join(ctx.eventId, 'ghost_session_0000', t0);
+    await r.join(ctx.eventId, 'alive_session_0000', t0 + 1);
+    await new Promise((res) => setTimeout(res, 1100)); // both heartbeats lapse...
+    await r.status(ctx.eventId, 'alive_session_0000'); // ...but only one is still polling
+    expect(await r.admit(ctx.eventId, 1000)).toEqual(['alive_session_0000']);
+    expect((await r.snapshot(ctx.eventId)).abandoned).toBe(1);
+  });
+
+  it('reclaims a slot if the admitted buyer never picks up their pass', async () => {
+    const r = new WaitingRoom(ctx.redis, { admitRatePerSec: 10, maxActive: 1, accessWindowSec: 600, claimWindowSec: 30 });
+    const now = Date.now();
+    await r.join(ctx.eventId, 'first_session_0000', now);
+    await r.join(ctx.eventId, 'second_session_000', now + 1);
+    expect(await r.admit(ctx.eventId, 1000, now)).toEqual(['first_session_0000']);
+    // 'first' never polls; after the 30s claim window its slot goes to the next in line.
+    await r.status(ctx.eventId, 'second_session_000'); // keep 'second' alive
+    expect(await r.admit(ctx.eventId, 1000, now + 31_000)).toEqual(['second_session_000']);
+  });
+
+  it('claiming extends the window to the full access window', async () => {
+    const now = Date.now();
+    await room.join(ctx.eventId, 'claimer_session_00', now);
+    await room.admit(ctx.eventId, 1000, now);
+    const status = await room.status(ctx.eventId, 'claimer_session_00', now + 10);
+    expect(status).toMatchObject({ state: 'admitted' });
+    expect((status as { expiresAt: number }).expiresAt).toBe(now + 10 + 60_000);
+  });
+});
+
 describe('admitter leader election', () => {
   it('only one of several instances admits at a time', async () => {
     const noop = { info: () => undefined, error: () => undefined };
