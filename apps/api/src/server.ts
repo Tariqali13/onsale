@@ -1,13 +1,35 @@
+import { loadEnvFiles } from './lib/loadEnv.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db/pool.js';
 import { migrate } from './db/migrate.js';
 import { seedDemo } from './db/seed.js';
+import { ensureDatabase, ensureRedis, StartupError } from './db/preflight.js';
 import { createRedis } from './lib/redis.js';
 import { buildApp, createServices } from './app.js';
 import { startAdmitter } from './queue/admitter.js';
 import { reconcilePending } from './checkout/reconciler.js';
 
-const config = loadConfig();
+loadEnvFiles();
+
+function fail(err: unknown): never {
+  if (err instanceof StartupError || (err instanceof Error && err.message.startsWith('Invalid environment'))) {
+    console.error(`\n✖ Onsale API could not start\n\n  ${(err as Error).message}\n`);
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
+}
+
+const config = (() => {
+  try {
+    return loadConfig();
+  } catch (err) {
+    return fail(err);
+  }
+})();
+
+await ensureDatabase(config.DATABASE_URL, { createIfMissing: config.NODE_ENV !== 'production' }).catch(fail);
+await ensureRedis(config.REDIS_URL).catch(fail);
 const db = createPool(config.DATABASE_URL);
 const redis = createRedis(config.REDIS_URL);
 

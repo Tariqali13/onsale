@@ -9,7 +9,8 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
   HOST: z.string().default('0.0.0.0'),
-  DATABASE_URL: z.string().url().default('postgres://postgres@localhost:5432/onsale'),
+  // Matches docker-compose.yml, so `docker compose up -d postgres redis && npm run dev` works with no .env.
+  DATABASE_URL: z.string().url().default('postgres://postgres:postgres@localhost:5432/onsale'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 

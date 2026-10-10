@@ -13,7 +13,7 @@ import { MockPaymentProvider } from '../src/payments/provider.js';
  * service containers in CI). Mocking the database would hide exactly the
  * concurrency behaviour these tests exist to prove.
  */
-export const TEST_DB_URL = process.env.TEST_DATABASE_URL || 'postgres://postgres@localhost:5432/onsale_test';
+export const TEST_DB_URL = process.env.TEST_DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/onsale_test';
 export const TEST_REDIS_URL = process.env.TEST_REDIS_URL || 'redis://localhost:6379/15';
 
 export interface TestContext {

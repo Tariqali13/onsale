@@ -134,11 +134,22 @@ you can double-click Pay and watch it charge once.
 
 ### Run locally
 
+Needs Node 22+, Postgres and Redis. The quickest way to get both is Docker:
+
 ```bash
 docker compose up -d postgres redis
 npm install
 npm run dev              # API on :4000 (OpenAPI docs at /docs), web on :5173
 ```
+
+**Using your own Postgres and Redis instead** (e.g. Postgres.app and
+`brew install redis && brew services start redis` on macOS): copy `.env.example` to
+`.env` and set `DATABASE_URL` to your own username and password. The API reads `.env`
+from the repo root or `apps/api/`, creates the database if it doesn't exist yet, and if
+Postgres or Redis can't be reached it says which one and how to fix it.
+
+`npm test` uses a separate `onsale_test` database and Redis db 15; override them with
+`TEST_DATABASE_URL` and `TEST_REDIS_URL`.
 
 Add Prometheus and a pre-built Grafana dashboard with
 `docker compose --profile observability up`.
