@@ -111,7 +111,16 @@ export class WaitingRoom {
     return randomBytes(16).toString('base64url');
   }
 
-  async join(eventId: string, sessionId: string, now = Date.now()): Promise<'joined' | 'waiting' | 'active'> {
+  /**
+   * @param heartbeatSec override for clients that can't poll (the crowd simulator's
+   *   bots are "patient" so they don't each cost a Redis write per second).
+   */
+  async join(
+    eventId: string,
+    sessionId: string,
+    now = Date.now(),
+    heartbeatSec?: number,
+  ): Promise<'joined' | 'waiting' | 'active'> {
     // Tie-break same-millisecond joins with a fractional component so ordering is stable.
     const score = now + Math.random() / 1000;
     return (await this.redis.eval(
@@ -123,7 +132,7 @@ export class WaitingRoom {
       keys.heartbeat(eventId, sessionId),
       sessionId,
       String(score),
-      String(this.heartbeatMs),
+      String(heartbeatSec ? heartbeatSec * 1000 : this.heartbeatMs),
     )) as 'joined' | 'waiting' | 'active';
   }
 
@@ -167,6 +176,16 @@ export class WaitingRoom {
       String(this.claimWindowMs),
       keys.heartbeat(eventId, ''),
     )) as string[];
+  }
+
+  /** Remove sessions that have given up waiting (e.g. after a sell-out). */
+  async abandon(eventId: string, sessionIds: string[]): Promise<void> {
+    if (sessionIds.length) await this.redis.zrem(keys.waiting(eventId), ...sessionIds);
+  }
+
+  /** All currently admitted sessions, in one round trip. */
+  async activeSessions(eventId: string, now = Date.now()): Promise<Set<string>> {
+    return new Set(await this.redis.zrangebyscore(keys.active(eventId), now, '+inf'));
   }
 
   async isActive(eventId: string, sessionId: string, now = Date.now()): Promise<boolean> {

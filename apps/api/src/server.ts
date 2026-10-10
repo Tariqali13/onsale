@@ -18,6 +18,13 @@ const bootLog = { error: (o: object, msg: string) => console.error(msg, o) };
 const services = createServices(config, db, redis, bootLog);
 const app = await buildApp(services);
 
+// Track buyer-facing traffic so background work can sleep when nobody is here.
+let lastActivity = Date.now();
+app.addHook('onRequest', async (req) => {
+  if (req.url.startsWith('/events/')) lastActivity = Date.now();
+});
+const isIdle = () => Date.now() - lastActivity > 60_000 && services.simulator.activeBots === 0;
+
 const stopAdmitter = config.RUN_ADMITTER
   ? startAdmitter({
       redis,
@@ -25,10 +32,12 @@ const stopAdmitter = config.RUN_ADMITTER
       listOpenEvents: () => services.events.listOpenEvents(),
       onAdmitted: (_e, n) => services.metrics.queueAdmitted.inc(n),
       log: app.log,
+      isIdle,
     })
   : async () => undefined;
 
 const reconcileTimer = setInterval(() => {
+  if (isIdle()) return;
   reconcilePending(services)
     .then((r) => (r.paid || r.failed) && app.log.info(r, 'reconciler settled orders'))
     .catch((err) => app.log.error({ err }, 'reconciler failed'));

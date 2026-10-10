@@ -24,6 +24,12 @@ export interface AdmitterDeps {
   onAdmitted?: (eventId: string, count: number) => void;
   log: { info: (o: object, msg: string) => void; error: (o: object, msg: string) => void };
   tickMs?: number;
+  /**
+   * When true, the tick is skipped entirely (no Redis calls). Managed Redis free
+   * tiers bill per command, and an idle demo shouldn't burn ~170k commands a day
+   * renewing a lock. Leadership simply lapses and is re-acquired on the next busy tick.
+   */
+  isIdle?: () => boolean;
 }
 
 /**
@@ -41,6 +47,10 @@ export function startAdmitter(deps: AdmitterDeps): () => Promise<void> {
   let running: Promise<void> = Promise.resolve();
 
   const tick = async () => {
+    if (deps.isIdle?.()) {
+      isLeader = false;
+      return;
+    }
     const owned = (await deps.redis.eval(RENEW_LUA, 1, keys.admitterLock(), instanceId, String(tickMs * 3))) === 1;
     if (owned !== isLeader) {
       isLeader = owned;

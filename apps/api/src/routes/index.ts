@@ -288,6 +288,7 @@ export async function registerRoutes(fastify: FastifyInstance, s: Services) {
       if (!s.config.ENABLE_SIMULATOR) throw new AppError(403, 'simulator_disabled', 'The simulator is disabled here.');
       await s.events.get(req.params.eventId);
       const spawned = await s.simulator.spawn(req.params.eventId, req.body.bots);
+      if (spawned === 0) throw new AppError(409, 'sold_out', 'This onsale is sold out. Reset it to release a new crowd.');
       return { spawned };
     },
   );

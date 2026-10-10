@@ -93,7 +93,7 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     global: true,
     max: 300,
     timeWindow: '1 minute',
-    redis: config.NODE_ENV === 'test' ? undefined : services.redis,
+    redis: config.NODE_ENV === 'test' || config.RATE_LIMIT_STORE === 'memory' ? undefined : services.redis,
     nameSpace: 'rl:',
     skipOnError: true, // fail open: a Redis blip must not take the storefront down
   });

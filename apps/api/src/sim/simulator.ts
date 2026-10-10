@@ -37,6 +37,7 @@ export class CrowdSimulator {
   }
 
   async spawn(eventId: string, count: number): Promise<number> {
+    if (await this.isSoldOut(eventId)) return 0;
     const room = Math.max(0, CrowdSimulator.MAX_BOTS - this.activeBots);
     const n = Math.min(count, room);
     const now = Date.now();
@@ -44,10 +45,15 @@ export class CrowdSimulator {
     for (let i = 0; i < n; i++) {
       created.push({ session: `bot_${WR.newSessionId()}`, eventId, stage: 'queued', attempts: 0, nextActionAt: now });
     }
-    for (const bot of created) await this.deps.room.join(eventId, bot.session, now + Math.random() * 50);
+    for (const bot of created) await this.deps.room.join(eventId, bot.session, now + Math.random() * 50, 900);
     this.bots.push(...created);
     this.start();
     return n;
+  }
+
+  private async isSoldOut(eventId: string): Promise<boolean> {
+    const [{ seats }, sold] = await Promise.all([this.deps.events.seats(eventId), this.deps.holds.soldCount(eventId)]);
+    return sold >= seats.length;
   }
 
   stop(): void {
@@ -72,23 +78,30 @@ export class CrowdSimulator {
 
   private async step() {
     const now = Date.now();
-    const due = this.bots.filter((b) => b.stage !== 'done' && b.nextActionAt <= now).slice(0, 60);
+    if (this.bots.length === 0) return this.stop();
+    const events = [...new Set(this.bots.filter((b) => b.stage === 'queued').map((b) => b.eventId))];
+    // Like real buyers told "sold out", queued bots leave the line at once.
+    for (const e of events) {
+      if (!(await this.isSoldOut(e))) continue;
+      const leaving = this.bots.filter((b) => b.eventId === e && b.stage === 'queued');
+      await this.deps.room.abandon(e, leaving.map((b) => b.session));
+      for (const b of leaving) b.stage = 'done';
+    }
+    // One round trip per event tells every queued bot whether it has been admitted.
+    const admitted = new Map(await Promise.all(events.map(async (e) => [e, await this.deps.room.activeSessions(e)] as const)));
+    for (const bot of this.bots) {
+      if (bot.stage === 'queued' && admitted.get(bot.eventId)?.has(bot.session)) {
+        bot.stage = 'shopping';
+        bot.nextActionAt = now + 800 + Math.random() * 2500; // "browsing the seat map"
+      }
+    }
+    const due = this.bots.filter((b) => b.stage === 'shopping' && b.nextActionAt <= now).slice(0, 60);
     await Promise.all(due.map((b) => this.act(b, now)));
     this.bots = this.bots.filter((b) => b.stage !== 'done');
     if (this.bots.length === 0) this.stop();
   }
 
   private async act(bot: Bot, now: number) {
-    if (bot.stage === 'queued') {
-      if (await this.deps.room.isActive(bot.eventId, bot.session)) {
-        bot.stage = 'shopping';
-        bot.nextActionAt = now + 800 + Math.random() * 2500; // "browsing the seat map"
-      } else {
-        bot.nextActionAt = now + 1000;
-      }
-      return;
-    }
-
     const { seats } = await this.deps.events.seats(bot.eventId);
     const { states } = await this.deps.seatMap.snapshot(bot.eventId);
     const pick = pickAdjacent(seats, (id) => states.get(id) === 'available', 1 + Math.floor(Math.random() * 4));

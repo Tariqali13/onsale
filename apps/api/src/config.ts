@@ -47,6 +47,8 @@ const EnvSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  /** 'redis' shares limits across instances; 'memory' saves Redis commands on single-instance free-tier deploys. */
+  RATE_LIMIT_STORE: z.enum(['redis', 'memory']).default('redis'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
