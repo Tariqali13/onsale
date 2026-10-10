@@ -1,0 +1,14 @@
+{
+  "name": "onsale",
+  "private": true,
+  "description": "High-concurrency ticket onsale engine: virtual waiting room, atomic seat holds, idempotent checkout.",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": { "node": ">=20" }
+}
