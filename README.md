@@ -122,7 +122,9 @@ npm test          # 37 API integration tests + 5 web unit tests
 
 ## Try it
 
-**Live demo:** _link added after deployment_ (see [DEPLOY.md](DEPLOY.md); runs entirely on free tiers).
+**Live demo: [onsalerender.netlify.app](https://onsalerender.netlify.app)** (free tier: the first
+visit after a quiet spell takes ~30 s while the API wakes up). Deployment notes are in
+[DEPLOY.md](DEPLOY.md).
 
 Open the **Live ops** page, release 500 simulated buyers, then join the queue yourself
 and compete with them for seats. The test cards cover a decline and a slow network, so
