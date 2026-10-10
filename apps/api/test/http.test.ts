@@ -30,6 +30,31 @@ async function enterStore(): Promise<{ sessionId: string; token: string }> {
 }
 
 describe('HTTP API', () => {
+  it('lets the web app call every method it uses cross-origin (CORS preflight)', async () => {
+    // The web app is served from a different origin than the API, so browsers send a
+    // preflight for each non-simple request. app.inject skips CORS, so test it explicitly.
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      const res = await app.inject({
+        method: 'OPTIONS',
+        url: `/events/${ctx.eventId}/cart`,
+        headers: {
+          origin: 'http://localhost:5173',
+          'access-control-request-method': method,
+          'access-control-request-headers': 'authorization,content-type,idempotency-key',
+        },
+      });
+      expect(res.statusCode, method).toBe(204);
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(String(res.headers['access-control-allow-methods']), method).toContain(method);
+    }
+    const foreign = await app.inject({
+      method: 'OPTIONS',
+      url: `/events/${ctx.eventId}/cart`,
+      headers: { origin: 'https://evil.example', 'access-control-request-method': 'PUT' },
+    });
+    expect(foreign.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('resolves events by slug and serves the seat map', async () => {
     const event = (await app.inject({ url: '/events/midnight-signal-live' })).json();
     expect(event.id).toBe(ctx.eventId);

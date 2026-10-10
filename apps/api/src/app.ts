@@ -87,6 +87,8 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: config.CORS_ORIGIN.split(',').map((s) => s.trim()),
+    // @fastify/cors only allows GET, HEAD and POST by default; the cart uses PUT and DELETE.
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['content-type', 'authorization', 'idempotency-key', 'x-session-id'],
   });
   if (config.RATE_LIMIT_ENABLED) await app.register(rateLimit, {
