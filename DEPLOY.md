@@ -12,14 +12,17 @@ Netlify; check Render's current terms when you sign up.
 
 ## 1. Postgres on Neon
 
-1. Create a project, then copy the **pooled** connection string. It ends with
-   `?sslmode=require`.
+1. Create a project, then copy the **direct** connection string: turn *Connection
+   pooling* off, so the host has no `-pooler`. It ends with `?sslmode=require`.
+   Migrations take a session-level advisory lock, which a transaction-mode pooler
+   can't hold across statements; a single small API instance doesn't need pooling.
 2. Nothing else: the API runs its migrations and seeds the demo event on start.
 
 ## 2. Redis on Upstash
 
 1. Create a Redis database in the region closest to your Render region.
-2. Copy the `rediss://…` connection URL (TLS).
+2. Copy only the `rediss://default:…@….upstash.io:6379` URL. Upstash also shows a
+   `redis-cli --tls -u …` command; paste just the URL, with `rediss://` (TLS).
 
 ## 3. API on Render
 

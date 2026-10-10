@@ -11,7 +11,11 @@ const EnvSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   // Matches docker-compose.yml, so `docker compose up -d postgres redis && npm run dev` works with no .env.
   DATABASE_URL: z.string().url().default('postgres://postgres:postgres@localhost:5432/onsale'),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
+  // Validated without echoing the value: a bad paste must never print a password into logs.
+  REDIS_URL: z
+    .string()
+    .regex(/^rediss?:\/\/\S+$/, 'must be a single redis:// or rediss:// URL (copy only the URL, not a redis-cli command)')
+    .default('redis://localhost:6379'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   /** HMAC secret for signing waiting-room access tokens. */

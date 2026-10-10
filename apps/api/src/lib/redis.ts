@@ -18,12 +18,24 @@ export const keys = {
   admitterLock: () => 'lock:admitter',
 };
 
+/**
+ * TLS for rediss:// URLs, and for Upstash hosts even when pasted as redis://
+ * (Upstash only accepts TLS connections).
+ */
+export function redisTls(url: string): object | undefined {
+  if (url.startsWith('rediss://')) return {};
+  try {
+    return new URL(url).hostname.endsWith('.upstash.io') ? {} : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createRedis(url: string): Redis {
   return new Redis(url, {
     maxRetriesPerRequest: 3,
     enableAutoPipelining: true,
-    // Upstash and other managed providers use rediss:// with TLS.
-    tls: url.startsWith('rediss://') ? {} : undefined,
+    tls: redisTls(url),
   });
 }
 

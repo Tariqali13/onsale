@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { Redis } from 'ioredis';
+import { redisTls } from '../lib/redis.js';
 
 /** A startup failure with a human-readable explanation and fix. */
 export class StartupError extends Error {
@@ -80,7 +81,7 @@ export async function ensureRedis(url: string): Promise<void> {
     maxRetriesPerRequest: 0,
     retryStrategy: () => null,
     connectTimeout: 5000,
-    tls: url.startsWith('rediss://') ? {} : undefined,
+    tls: redisTls(url),
   });
   probe.on('error', () => undefined);
   try {
