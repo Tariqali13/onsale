@@ -1,0 +1,840 @@
+/*
+ * Onsale — visual language
+ * The venue at night: deep indigo house lights, sodium-yellow for what you can buy,
+ * stage magenta for what's yours. Gig-poster condensed type for the things that
+ * matter (your place in line, the act, the seat), a hyper-legible face for the rest.
+ * The one recurring motif is the ticket perforation.
+ */
+:root {
+  --night: #1d1846;
+  --night-2: #272059;
+  --night-3: #342c72;
+  --line: #463d8c;
+  --paper: #f1f2f8;
+  --ink: #1d1846;
+  --ink-soft: #4d4880;
+  --text: #ece9ff;
+  --text-soft: #b3acdf;
+  --signal: #ffc93c;
+  --signal-ink: #2a1f00;
+  --spot: #ef5a9d;
+  --held: #6c60b5;
+  --sold: #3a3373;
+  --ok: #5fd3a1;
+  --bad: #ff8a7a;
+
+  --display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: 2.4rem;
+  --step-4: 3.6rem;
+  --step-5: clamp(4.4rem, 15vw, 8.5rem);
+
+  --radius-ticket: 14px;
+  --gutter: clamp(16px, 4vw, 40px);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+  max-width: 68ch;
+}
+
+a {
+  color: var(--signal);
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 64px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0 28px;
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 1.7rem;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.wordmark svg {
+  width: 34px;
+  height: 22px;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.nav a {
+  color: var(--text-soft);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: var(--step--1);
+}
+
+.nav a:hover {
+  color: var(--text);
+}
+
+.nav a[aria-current='page'] {
+  color: var(--night);
+  background: var(--text);
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 14px 26px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn-primary {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #ffd766;
+}
+
+.btn-quiet {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1.5px var(--text-soft);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ---------- ticket (the motif) ----------
+ * A ticket is two stubs joined along a perforated tear line, with a notch cut
+ * into each edge exactly where the tear is. Content decides which side of the
+ * tear it belongs on (what you're buying above, how you pay below). */
+
+.ticket {
+  --notch: 12px;
+  display: grid;
+  color: var(--ink);
+}
+
+.ticket-top,
+.ticket-bottom {
+  background: var(--paper);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  position: relative;
+}
+
+.ticket-top {
+  border-radius: var(--radius-ticket) var(--radius-ticket) 0 0;
+  padding-bottom: 20px;
+  mask: radial-gradient(circle var(--notch) at 0 100%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% 100%, #0000 97%, #000) right / 51% 100% no-repeat;
+}
+
+.ticket-bottom {
+  border-radius: 0 0 var(--radius-ticket) var(--radius-ticket);
+  padding-top: 22px;
+  mask: radial-gradient(circle var(--notch) at 0 0, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% 0, #0000 97%, #000) right / 51% 100% no-repeat;
+}
+
+.ticket-bottom::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(var(--notch) + 8px);
+  right: calc(var(--notch) + 8px);
+  border-top: 2px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+/* ---------- event page ---------- */
+
+.event-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: start;
+  padding-top: 12px;
+}
+
+.poster-title {
+  font-size: var(--step-5);
+  text-transform: uppercase;
+  line-height: 0.82;
+  font-weight: 900;
+}
+
+.poster-title span {
+  display: block;
+}
+
+.poster-title .outline {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--text);
+}
+
+.poster-meta {
+  margin-top: 28px;
+  display: grid;
+  gap: 4px;
+  font-size: var(--step-1);
+}
+
+.poster-meta strong {
+  font-family: var(--display);
+  font-size: var(--step-2);
+  font-weight: 800;
+}
+
+.poster-meta span {
+  color: var(--text-soft);
+}
+
+
+
+.onsale-card h2 {
+  font-size: var(--step-3);
+}
+
+.onsale-card .lede {
+  color: var(--ink-soft);
+}
+
+.tally {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tally div {
+  display: grid;
+}
+
+.tally b {
+  font-family: var(--display);
+  font-size: var(--step-3);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tally span {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.sellbar {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  overflow: hidden;
+}
+
+.sellbar i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: inherit;
+  transition: width 600ms ease;
+}
+
+.onsale-card .btn-quiet {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.onsale-card .btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.onsale-card .btn-primary:hover:not(:disabled) {
+  background: var(--night-3);
+}
+
+.fineprint {
+  font-size: var(--step--1);
+  color: var(--ink-soft);
+}
+
+.journey {
+  margin-top: clamp(56px, 8vw, 96px);
+  display: grid;
+  gap: 24px;
+}
+
+.journey > h2 {
+  font-size: var(--step-3);
+}
+
+.journey ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  counter-reset: step;
+}
+
+.journey li {
+  counter-increment: step;
+  border-top: 2px dashed var(--line);
+  padding-top: 18px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.journey li::before {
+  content: counter(step);
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: var(--step-3);
+  color: var(--signal);
+  line-height: 1;
+}
+
+.journey h3 {
+  font-size: var(--step-2);
+}
+
+.journey p {
+  color: var(--text-soft);
+}
+
+.journey code {
+  color: var(--text);
+  font-size: 0.92em;
+}
+
+/* ---------- queue ---------- */
+
+.queue {
+  min-height: 70vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.queue-inner {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  max-width: 640px;
+}
+
+.queue-number {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(7rem, 30vw, 16rem);
+  line-height: 0.8;
+  color: var(--signal);
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-number.admitted {
+  color: var(--ok);
+}
+
+.queue-caption {
+  font-size: var(--step-1);
+}
+
+.queue-caption + p {
+  color: var(--text-soft);
+}
+
+.drain {
+  width: min(520px, 100%);
+  height: 6px;
+  background: var(--night-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.drain i {
+  display: block;
+  height: 100%;
+  background: var(--signal);
+  transition: width 900ms ease;
+}
+
+/* ---------- seats ---------- */
+
+.buy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 28px;
+  align-items: start;
+}
+
+.venue {
+  background: var(--night-2);
+  border-radius: 20px;
+  padding: 12px;
+  position: relative;
+}
+
+.venue svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: manipulation;
+}
+
+.seat {
+  cursor: pointer;
+  transition: fill 160ms ease;
+}
+
+.seat[data-state='held'],
+.seat[data-state='sold'] {
+  cursor: default;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: var(--step--1);
+  color: var(--text-soft);
+  padding: 8px 6px 2px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.cart {
+  position: sticky;
+  top: 16px;
+}
+
+.cart h2 {
+  font-size: var(--step-2);
+}
+
+.cart-seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.cart-seats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--step--1);
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 700;
+}
+
+.cart-total b {
+  font-family: var(--display);
+  font-size: var(--step-3);
+  line-height: 1;
+}
+
+.qty {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.qty select {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  background: #fff;
+  color: var(--ink);
+}
+
+.timer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: var(--step--1);
+}
+
+.timer b {
+  font-family: var(--display);
+  font-size: var(--step-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.timer.urgent b {
+  color: var(--spot);
+}
+
+.cart .btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.cart .btn-primary:hover:not(:disabled) {
+  background: var(--night-3);
+}
+
+.cart .btn-quiet {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.cards {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.cards legend {
+  font-weight: 700;
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.cards label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  cursor: pointer;
+  font-size: var(--step--1);
+}
+
+.cards label:has(input:checked) {
+  border-color: var(--ink);
+  background: #fff;
+}
+
+.cards input {
+  margin-top: 3px;
+  accent-color: var(--ink);
+}
+
+.cards small {
+  display: block;
+  color: var(--ink-soft);
+}
+
+.notice {
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: var(--step--1);
+  background: color-mix(in srgb, var(--bad) 22%, #fff);
+  color: #5a1309;
+}
+
+.notice.info {
+  background: color-mix(in srgb, var(--signal) 30%, #fff);
+  color: var(--signal-ink);
+}
+
+/* ---------- confirmation ---------- */
+
+.confirm {
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+  padding-top: 12px;
+}
+
+.stub {
+  width: min(560px, 100%);
+}
+
+.stub h1 {
+  font-size: var(--step-4);
+  text-transform: uppercase;
+}
+
+.stub dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.stub dt {
+  color: var(--ink-soft);
+}
+
+.stub dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.barcode {
+  height: 54px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 4px, var(--ink) 4px 7px, transparent 7px 9px, var(--ink) 9px 10px, transparent 10px 13px);
+  border-radius: 2px;
+}
+
+/* ---------- ops ---------- */
+
+.ops-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.ops-head h1 {
+  font-size: var(--step-4);
+}
+
+.ops-head p {
+  color: var(--text-soft);
+  margin-top: 8px;
+}
+
+.ops-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.metric {
+  background: var(--night);
+  padding: 18px 18px 14px;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.metric > span {
+  color: var(--text-soft);
+  font-size: var(--step--1);
+}
+
+.metric b {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: var(--step-3);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric small {
+  color: var(--text-soft);
+}
+
+.metric.guarantee b {
+  color: var(--ok);
+}
+
+.metric svg {
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+}
+
+.ops-notes {
+  margin-top: 36px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.ops-notes h2 {
+  font-size: var(--step-2);
+  margin-bottom: 8px;
+}
+
+.ops-notes p {
+  color: var(--text-soft);
+}
+
+.center-msg {
+  min-height: 50vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.center-msg h1 {
+  font-size: var(--step-4);
+}
+
+.footer {
+  margin-top: 72px;
+  border-top: 2px dashed var(--line);
+  padding-top: 20px;
+  color: var(--text-soft);
+  font-size: var(--step--1);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 960px) {
+  .event-hero,
+  .buy {
+    grid-template-columns: 1fr;
+  }
+  .cart {
+    position: static;
+  }
+  .ops-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .journey ol,
+  .ops-notes {
+    grid-template-columns: 1fr;
+  }
+  .poster-title .outline {
+    -webkit-text-stroke-width: 1.5px;
+  }
+}
