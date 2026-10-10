@@ -1,0 +1,14 @@
+# Netlify config for the web app. Build from the repo root so npm workspaces install.
+# The API runs on Render (see DEPLOY.md); its URL is public, not a secret.
+[build]
+  command = "npm run build -w @onsale/web"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  VITE_API_URL = "https://onsale-api.onrender.com"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

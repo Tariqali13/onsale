@@ -36,12 +36,14 @@ while takes up to a minute. The web app shows a "waking up" message while that h
 
 ## 4. Web on Vercel (or Netlify)
 
-1. Import the repository and set the **root directory** to `apps/web`.
+1. Vercel: import the repository and set the **root directory** to `apps/web`.
+   Netlify: import with no base directory; the root `netlify.toml` builds `apps/web`
+   and sets `VITE_API_URL` (edit it if your API URL differs).
 2. Framework preset: Vite. Build command `npm run build`, output `dist`.
 3. Environment variable `VITE_API_URL=https://<your-api>.onrender.com`.
 4. Deploy, then put the resulting URL into the API's `CORS_ORIGIN` and redeploy the API.
 
-`apps/web/vercel.json` and `apps/web/netlify.toml` already handle client-side routing.
+`apps/web/vercel.json` and the root `netlify.toml` already handle client-side routing.
 
 ## Staying inside the free limits
 
