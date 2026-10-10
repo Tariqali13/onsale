@@ -38,30 +38,65 @@ export async function registerRoutes(fastify: FastifyInstance, s: Services) {
     async (req) => s.events.get(req.params.eventId),
   );
 
+  // The seat catalog never changes during an onsale: serve it once, cache it everywhere.
+  const catalogCache = new Map<string, string>();
   app.get(
     '/events/:eventId/seats',
     {
       schema: {
         tags: ['events'],
-        summary: 'Live seat availability (one Redis round trip, no DB query)',
+        summary: 'Static seat catalog (section, row, number, all-in price). Cacheable.',
+        params: EventParams,
+      },
+    },
+    async (req, reply) => {
+      const { eventId } = req.params;
+      let body = catalogCache.get(eventId);
+      if (!body) {
+        const { seats } = await s.events.seats(eventId);
+        body = JSON.stringify({
+          seats: seats.map((seat) => ({
+            id: seat.id,
+            section: seat.section,
+            row: seat.row,
+            number: seat.number,
+            priceCents: allInPrice(seat.priceCents),
+          })),
+        });
+        catalogCache.set(eventId, body);
+      }
+      reply.header('cache-control', 'public, max-age=300').type('application/json');
+      return body;
+    },
+  );
+
+  app.get(
+    '/events/:eventId/availability',
+    {
+      config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
+      schema: {
+        tags: ['events'],
+        summary: 'Live availability: one character per catalog seat (a/h/s) plus your own held seats',
+        description:
+          'Polled by every shopper, so it is built from a 250ms shared snapshot and is ~1 byte per seat. ' +
+          'Staleness is safe: holds are validated atomically.',
         params: EventParams,
         querystring: z.object({ session: z.string().max(64).optional() }),
       },
     },
     async (req) => {
       const { eventId } = req.params;
-      const { seats } = await s.events.seats(eventId);
-      const states = await s.holds.states(eventId, seats.map((x) => x.id), req.query.session);
+      const [snap, cart] = await Promise.all([
+        s.seatMap.snapshot(eventId),
+        req.query.session ? s.holds.cart(eventId, req.query.session) : Promise.resolve({ seatIds: [], expiresAt: null }),
+      ]);
       return {
-        seats: seats.map((seat) => ({
-          id: seat.id,
-          section: seat.section,
-          row: seat.row,
-          number: seat.number,
-          priceCents: allInPrice(seat.priceCents),
-          state: states.get(seat.id)!,
-        })),
-        generatedAt: Date.now(),
+        states: snap.code,
+        mine: cart.seatIds,
+        holdExpiresAt: cart.expiresAt,
+        available: snap.available,
+        sold: snap.sold,
+        generatedAt: snap.at,
       };
     },
   );
@@ -102,9 +137,33 @@ export async function registerRoutes(fastify: FastifyInstance, s: Services) {
     async (req) => {
       const { eventId, sessionId } = req.params;
       const status = await s.room.status(eventId, sessionId);
-      if (status.state !== 'admitted') return status;
+      if (status.state !== 'admitted') {
+        // Tell waiting buyers the truth as soon as every seat is sold, rather than letting them wait for nothing.
+        const [{ seats }, sold] = await Promise.all([s.events.seats(eventId), s.holds.soldCount(eventId)]);
+        if (sold >= seats.length) return { state: 'sold_out' as const };
+        return status;
+      }
       const accessToken = await s.tokens.issue({ session: sessionId, eventId }, status.expiresAt);
       return { ...status, accessToken };
+    },
+  );
+
+  app.post(
+    '/events/:eventId/queue/leave',
+    {
+      preHandler: guard,
+      schema: {
+        tags: ['queue'],
+        summary: 'Leave the store early, releasing held seats and the shopping slot for the next person in line',
+        security: [{ accessPass: [] }],
+        params: EventParams,
+      },
+    },
+    async (req) => {
+      const { eventId } = req.params;
+      const released = await s.holds.release(eventId, req.access!.session);
+      await s.room.release(eventId, req.access!.session);
+      return { released };
     },
   );
 
@@ -198,13 +257,13 @@ export async function registerRoutes(fastify: FastifyInstance, s: Services) {
     async (req) => {
       const { eventId } = req.params;
       const { seats } = await s.events.seats(eventId);
-      const [queue, sales, states] = await Promise.all([
+      const [queue, sales, snap] = await Promise.all([
         s.room.snapshot(eventId),
         s.events.salesSummary(eventId),
-        s.holds.states(eventId, seats.map((x) => x.id)),
+        s.seatMap.snapshot(eventId),
       ]);
       let held = 0;
-      for (const st of states.values()) if (st === 'held') held++;
+      for (const st of snap.states.values()) if (st === 'held') held++;
       return {
         queue,
         sales: { ...sales, capacity: seats.length, held },

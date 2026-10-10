@@ -33,9 +33,13 @@ describe('HTTP API', () => {
   it('resolves events by slug and serves the seat map', async () => {
     const event = (await app.inject({ url: '/events/midnight-signal-live' })).json();
     expect(event.id).toBe(ctx.eventId);
-    const seats = (await app.inject({ url: `/events/${ctx.eventId}/seats` })).json().seats;
+    const seatsRes = await app.inject({ url: `/events/${ctx.eventId}/seats` });
+    expect(seatsRes.headers['cache-control']).toContain('max-age');
+    const seats = seatsRes.json().seats;
     expect(seats).toHaveLength(696);
-    expect(seats[0]).toMatchObject({ state: 'available' });
+    const avail = (await app.inject({ url: `/events/${ctx.eventId}/availability` })).json();
+    expect(avail.states).toBe('a'.repeat(696));
+    expect(avail).toMatchObject({ available: 696, sold: 0, mine: [] });
   });
 
   it('blocks the cart and checkout for sessions that skipped the queue', async () => {
@@ -61,8 +65,9 @@ describe('HTTP API', () => {
     const hold = await app.inject({ method: 'PUT', url: `/events/${ctx.eventId}/cart`, headers: auth, payload: { seatIds } });
     expect(hold.statusCode).toBe(200);
 
-    const mine = (await app.inject({ url: `/events/${ctx.eventId}/seats?session=${sessionId}` })).json().seats;
-    expect(mine.slice(0, 2).map((s: { state: string }) => s.state)).toEqual(['mine', 'mine']);
+    const avail = (await app.inject({ url: `/events/${ctx.eventId}/availability?session=${sessionId}` })).json();
+    expect(avail.states.slice(0, 2)).toBe('hh');
+    expect([...avail.mine].sort()).toEqual([...seatIds].sort());
 
     const missingKey = await app.inject({
       method: 'POST',
@@ -87,6 +92,7 @@ describe('HTTP API', () => {
     expect(replay.statusCode).toBe(201);
     expect(replay.json().orderId).toBe(paid.json().orderId);
 
+    expect((await app.inject({ url: `/events/${ctx.eventId}/availability` })).json().states.slice(0, 2)).toBe('ss');
     const stats = (await app.inject({ url: `/events/${ctx.eventId}/stats` })).json();
     expect(stats.sales).toMatchObject({ ticketsSold: 2, oversold: 0, paidOrders: 1 });
   });

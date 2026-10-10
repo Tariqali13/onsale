@@ -182,6 +182,10 @@ export class SeatHolds {
     return (await this.redis.exists(keys.soldLoaded(eventId))) === 1;
   }
 
+  async soldCount(eventId: string): Promise<number> {
+    return this.redis.scard(keys.sold(eventId));
+  }
+
   async unmarkSold(eventId: string, seatIds: string[]): Promise<void> {
     if (seatIds.length) await this.redis.srem(keys.sold(eventId), ...seatIds);
   }

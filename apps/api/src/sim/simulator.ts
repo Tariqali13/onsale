@@ -3,6 +3,7 @@ import type { WaitingRoom } from '../queue/waitingRoom.js';
 import { WaitingRoom as WR } from '../queue/waitingRoom.js';
 import type { SeatHolds } from '../holds/seatHolds.js';
 import type { EventsRepo, SeatRecord } from '../events/eventsRepo.js';
+import type { SeatMapCache } from '../events/seatMapCache.js';
 import { checkout, type CheckoutDeps } from '../checkout/checkout.js';
 
 interface Bot {
@@ -27,7 +28,7 @@ export class CrowdSimulator {
   static readonly MAX_BOTS = 3000;
 
   constructor(
-    private readonly deps: CheckoutDeps & { room: WaitingRoom; holds: SeatHolds; events: EventsRepo },
+    private readonly deps: CheckoutDeps & { room: WaitingRoom; holds: SeatHolds; events: EventsRepo; seatMap: SeatMapCache },
     private readonly log: { error: (o: object, msg: string) => void },
   ) {}
 
@@ -89,7 +90,7 @@ export class CrowdSimulator {
     }
 
     const { seats } = await this.deps.events.seats(bot.eventId);
-    const states = await this.deps.holds.states(bot.eventId, seats.map((s) => s.id));
+    const { states } = await this.deps.seatMap.snapshot(bot.eventId);
     const pick = pickAdjacent(seats, (id) => states.get(id) === 'available', 1 + Math.floor(Math.random() * 4));
     if (!pick) {
       bot.stage = 'done'; // sold out

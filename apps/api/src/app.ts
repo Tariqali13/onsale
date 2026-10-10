@@ -19,6 +19,7 @@ import { WaitingRoom } from './queue/waitingRoom.js';
 import { AccessTokens, type AccessClaims } from './queue/accessToken.js';
 import { SeatHolds } from './holds/seatHolds.js';
 import { EventsRepo } from './events/eventsRepo.js';
+import { SeatMapCache } from './events/seatMapCache.js';
 import { IdempotencyStore } from './checkout/idempotency.js';
 import { MockPaymentProvider, StripePaymentProvider, type PaymentProvider } from './payments/provider.js';
 import { CrowdSimulator } from './sim/simulator.js';
@@ -33,6 +34,7 @@ export interface Services {
   tokens: AccessTokens;
   holds: SeatHolds;
   events: EventsRepo;
+  seatMap: SeatMapCache;
   idempotency: IdempotencyStore;
   payments: PaymentProvider;
   simulator: CrowdSimulator;
@@ -53,13 +55,14 @@ export function createServices(config: Config, db: Db, redis: Redis, log: CrowdS
   });
   const holds = new SeatHolds(redis, config.HOLD_TTL_SEC);
   const events = new EventsRepo(db, holds);
+  const seatMap = new SeatMapCache(events, holds, config.NODE_ENV === 'test' ? 0 : 250);
   const idempotency = new IdempotencyStore(db);
   const provider =
     payments ??
     (config.PAYMENT_PROVIDER === 'stripe' ? new StripePaymentProvider(config.STRIPE_SECRET_KEY!) : new MockPaymentProvider());
   const tokens = new AccessTokens(config.ACCESS_TOKEN_SECRET);
-  const simulator = new CrowdSimulator({ db, holds, room, payments: provider, idempotency, metrics, events }, log);
-  return { config, db, redis, metrics, room, tokens, holds, events, idempotency, payments: provider, simulator };
+  const simulator = new CrowdSimulator({ db, holds, room, payments: provider, idempotency, metrics, events, seatMap }, log);
+  return { config, db, redis, metrics, room, tokens, holds, events, seatMap, idempotency, payments: provider, simulator };
 }
 
 type CrowdSimulatorLog = { error: (o: object, msg: string) => void };
@@ -86,7 +89,7 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     origin: config.CORS_ORIGIN.split(',').map((s) => s.trim()),
     allowedHeaders: ['content-type', 'authorization', 'idempotency-key', 'x-session-id'],
   });
-  await app.register(rateLimit, {
+  if (config.RATE_LIMIT_ENABLED) await app.register(rateLimit, {
     global: true,
     max: 300,
     timeWindow: '1 minute',
