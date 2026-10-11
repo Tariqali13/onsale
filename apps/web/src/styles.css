@@ -838,3 +838,82 @@ a {
     -webkit-text-stroke-width: 1.5px;
   }
 }
+
+/* ---------- Wake-up screen (free host cold start) ---------- */
+.warmup-placeholder {
+  min-height: 50vh;
+}
+
+.warmup {
+  min-height: 55vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 0;
+}
+
+.warmup-ticket {
+  position: relative;
+  width: min(560px, 100%);
+  padding: clamp(24px, 5vw, 40px);
+  background: var(--night-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ticket);
+  /* the ticket perforation */
+  background-image: radial-gradient(circle at 0 50%, var(--night) 12px, transparent 13px),
+    radial-gradient(circle at 100% 50%, var(--night) 12px, transparent 13px);
+}
+
+.warmup-kicker {
+  margin: 0 0 6px;
+  color: var(--signal);
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.warmup h1 {
+  margin: 0 0 12px;
+  font-size: var(--step-3);
+  line-height: 1.05;
+}
+
+.warmup p {
+  margin: 0 0 18px;
+  color: var(--text-soft);
+}
+
+.warmup-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sold);
+  overflow: hidden;
+}
+
+.warmup-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--signal), var(--spot));
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
+
+.warmup-meta {
+  margin: 14px 0 0 !important;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.warmup-time {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: var(--step-1);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warmup-bar span {
+    transition: none;
+  }
+}

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router';
+import { WarmUpGate } from './WarmUpGate';
 
 export const REPO_URL = 'https://github.com/Tariqali13/onsale';
 
@@ -22,7 +23,9 @@ export function Layout() {
         </nav>
       </header>
       <main>
-        <Outlet />
+        <WarmUpGate>
+          <Outlet />
+        </WarmUpGate>
       </main>
       <footer className="footer">
         <span>A demo of a high-traffic ticket onsale. The band, venue and payments are not real.</span>

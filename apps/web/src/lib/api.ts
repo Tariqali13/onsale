@@ -98,10 +98,18 @@ async function request<T>(path: string, init: RequestInit & { token?: string; id
     throw new ApiError(0, 'network_error', 'Can’t reach the box office. Check your connection; your place is kept.');
   }
   const text = await res.text();
-  const body = text ? JSON.parse(text) : {};
+  let body: Record<string, unknown> & { error?: { code?: string; message?: string } } = {};
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // While the free host wakes it answers with an HTML holding page.
+      throw new ApiError(503, 'waking', 'The box office is still opening. Give it a few seconds.');
+    }
+  }
   if (!res.ok) {
     const err = body?.error ?? {};
-    throw new ApiError(res.status, err.code ?? 'error', err.message ?? `Request failed (${res.status})`, err);
+    throw new ApiError(res.status, err.code ?? 'error', err.message ?? `Request failed (${res.status})`, err as Record<string, unknown>);
   }
   return body as T;
 }

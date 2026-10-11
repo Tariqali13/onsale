@@ -5,7 +5,14 @@ import { api } from './api';
 export const EVENT_SLUG = 'midnight-signal-live';
 
 export function useEvent() {
-  return useQuery({ queryKey: ['event', EVENT_SLUG], queryFn: () => api.event(EVENT_SLUG), staleTime: Infinity });
+  // Patient retries: a request can still race the tail end of a cold start.
+  return useQuery({
+    queryKey: ['event', EVENT_SLUG],
+    queryFn: () => api.event(EVENT_SLUG),
+    staleTime: Infinity,
+    retry: 4,
+    retryDelay: (n) => Math.min(1000 * 2 ** n, 8000),
+  });
 }
 
 export function useStats(eventId: string | undefined, intervalMs = 2000) {
