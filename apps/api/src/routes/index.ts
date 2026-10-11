@@ -7,6 +7,7 @@ import { WaitingRoom } from '../queue/waitingRoom.js';
 import { allInPrice } from '../checkout/pricing.js';
 import { checkout } from '../checkout/checkout.js';
 import { resetEvent } from '../events/reset.js';
+import { maybeAutoReset } from '../events/autoReset.js';
 
 const EventParams = z.object({ eventId: z.uuid() });
 const ErrorBody = z.object({ error: z.object({ code: z.string(), message: z.string() }).passthrough() });
@@ -35,7 +36,12 @@ export async function registerRoutes(fastify: FastifyInstance, s: Services) {
         params: z.object({ eventId: z.string().min(1).max(80) }),
       },
     },
-    async (req) => s.events.get(req.params.eventId),
+    async (req) => {
+      const event = await s.events.get(req.params.eventId);
+      // Every visit loads the event first: a sold-out demo left idle is put back on sale here.
+      await maybeAutoReset(s, event.id).catch((err) => req.log.error({ err }, 'auto-reset failed'));
+      return event;
+    },
   );
 
   // The seat catalog never changes during an onsale: serve it once, cache it everywhere.
